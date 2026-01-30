@@ -184,6 +184,7 @@
                 sand: `${REPO}/terrain/sand/beach.png`
             },
             units: {
+                thunderer: `${REPO}/units/dwarves/thunderer/thunderer.png`,
                 merman: `${REPO}/units/merfolk/fighter.png`,
                 human: `${REPO}/units/human-loyalists/spearman.png`,
                 mage: `${REPO}/units/human-magi/mage.png`,
@@ -319,7 +320,7 @@
             // 100% -> Ulfserker vs Adept
             if (prob >= 1) {
                 renderCombat(ASSETS.units.ulfserker, ASSETS.units.adept);
-                updateDisplay("Hahahahaha", "");
+                updateDisplay("100% KILL CHANCE", "It's over.");
                 return;
             }
 
@@ -327,11 +328,6 @@
             let terrainUrl = '';
             let text = '';
 
-            // Prob logic per SPEC.md list:
-            // - low: merman in water
-            // - medium: spearman in plains
-            // - high: mage on a plain
-            
             if (prob < 0.35) {
                 // Low (<35%)
                 unitUrl = ASSETS.units.merman;
@@ -349,17 +345,24 @@
                 text = "High Risk (Drake in Sand)";
             }
 
-            renderSingle(unitUrl, terrainUrl);
+            // Render with Dwarf Thunderer aimed at the risk unit
+            renderPrediction(unitUrl, terrainUrl);
             updateDisplay(`Item: ${formatMoney(parseFloat(elInput.value))}`, `Remaining: ${formatMoney(remaining)}`);
         }
 
-        function renderSingle(unitUrl, terrainUrl) {
-            let html = '';
-            if (terrainUrl) {
-                html += `<img src="${terrainUrl}" class="tile" alt="Terrain">`;
-            }
-            html += `<img src="${unitUrl}" class="unit" alt="Unit">`;
-            elScene.innerHTML = html;
+        function renderPrediction(riskUnitUrl, terrainUrl) {
+            // Dwarf Thunderer (Left) vs Risk Unit (Right) on Terrain
+            elScene.innerHTML = `
+                <img src="${terrainUrl}" class="tile" style="left: 80px;" alt="Terrain">
+                <img src="${ASSETS.units.thunderer}" class="unit attacker" alt="Thunderer">
+                <img src="${riskUnitUrl}" class="unit defender" alt="Risk Unit">
+            `;
+            elScene.classList.remove('hidden');
+        }
+
+        function renderSingle(unitUrl) {
+            // Center single unit (e.g. Ghoul)
+            elScene.innerHTML = `<img src="${unitUrl}" class="unit" alt="Unit">`;
             elScene.classList.remove('hidden');
         }
 
