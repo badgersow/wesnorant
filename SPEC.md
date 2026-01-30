@@ -34,9 +34,9 @@ The app favicon should be ghoul icon.
 
 The following units should be used to display probability:
 
-- low probability: merman in the water
+- low probability: saurian in hills
 - medium: spearman in plains
-- high probability: mage on a plain
+- high probability: drake in the sand
 - 100% probability: ulfserker next to a dark adept
 
 ## Example flow

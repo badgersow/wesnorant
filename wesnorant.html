@@ -180,14 +180,13 @@
         const ASSETS = {
             terrain: {
                 flat: `${REPO}/terrain/grass/green.png`,
-                water: `${REPO}/terrain/water/coast-tile.png`,
+                hills: `${REPO}/terrain/hills/regular.png`,
                 sand: `${REPO}/terrain/sand/beach.png`
             },
             units: {
                 thunderer: `${REPO}/units/dwarves/thunderer/thunderer.png`,
-                merman: `${REPO}/units/merfolk/fighter.png`,
+                saurian: `${REPO}/units/saurians/skirmisher/skirmisher.png`,
                 human: `${REPO}/units/human-loyalists/spearman.png`,
-                mage: `${REPO}/units/human-magi/mage.png`,
                 drake: `${REPO}/units/drakes/burner.png`,
                 ulfserker: `${REPO}/units/dwarves/ulfserker.png`,
                 adept: `${REPO}/units/undead-necromancers/adept.png`,
@@ -330,9 +329,9 @@
 
             if (prob < 0.35) {
                 // Low (<35%)
-                unitUrl = ASSETS.units.merman;
-                terrainUrl = ASSETS.terrain.water;
-                text = "Low Risk (Merman in Water)";
+                unitUrl = ASSETS.units.saurian;
+                terrainUrl = ASSETS.terrain.hills;
+                text = "Low Risk (Saurian in Hills)";
             } else if (prob < 0.70) {
                 // Medium (35% - 70%)
                 unitUrl = ASSETS.units.human;
