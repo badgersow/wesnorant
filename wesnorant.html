@@ -180,12 +180,14 @@
         const ASSETS = {
             terrain: {
                 flat: `${REPO}/terrain/grass/green.png`,
-                water: `${REPO}/terrain/water/coast-tile.png`
+                water: `${REPO}/terrain/water/coast-tile.png`,
+                sand: `${REPO}/terrain/sand/beach.png`
             },
             units: {
                 merman: `${REPO}/units/merfolk/fighter.png`,
                 human: `${REPO}/units/human-loyalists/spearman.png`,
                 mage: `${REPO}/units/human-magi/mage.png`,
+                drake: `${REPO}/units/drakes/burner.png`,
                 ulfserker: `${REPO}/units/dwarves/ulfserker.png`,
                 adept: `${REPO}/units/undead-necromancers/adept.png`,
                 ghoul: `${REPO}/units/undead/ghoul.png`
@@ -342,9 +344,9 @@
                 text = "Medium Risk (Spearman in Plains)";
             } else {
                 // High (>= 70%)
-                unitUrl = ASSETS.units.mage;
-                terrainUrl = ASSETS.terrain.flat;
-                text = "High Risk (Mage in Plains)";
+                unitUrl = ASSETS.units.drake;
+                terrainUrl = ASSETS.terrain.sand;
+                text = "High Risk (Drake in Sand)";
             }
 
             renderSingle(unitUrl, terrainUrl);
