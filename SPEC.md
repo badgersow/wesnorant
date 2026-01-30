@@ -24,8 +24,37 @@ I will host it at my personal website at https://kocour.dev/wesnorant.html
 
 I want the design to follow Wesnoth video game. It's a open source game and all assets are free. The "wesnoth" theme will work in two different aspects.
 
-1. When the number is entered, we know the probability of payment. This probability should be visualized by rendering weshoth item on a terrain, with the probability close to the hit chance. For example, if the probability of payment is 70%, it should be rendered as elven archer in forest. This will visually indicate the expected chance. It's supposed to be funny, because my friends are wesnoth and math nerds.
-2. When the item is entered with 100% probability (equal or larger than total), it should be displayed as ulfserker next to the dark adept. It will indicate the chance of 100% kill.
+1. When the number is entered, we know the probability of payment. This probability should be visualized by rendering weshoth item on a terrain, with the probability close to the hit chance. For example, if the probability of hitting a unit is 30%, it should be rendered as saurian in the swamp (who has defense 70% and chance to be hit 30%). This will visually indicate the expected chance. It's supposed to be funny, because my friends are wesnoth and math nerds.
+2. When the item is entered with 100% probability (equal or larger than total), it should be displayed as ulfserker next to the dark adept (with no background). It will indicate the chance of 100% kill.
+
+Background terrains must always look like hexes. Images and text should never overlap.
+On 100% probability, ulfserker and dark adept should be displayed next to each other without backgrounds.
+On game over, a ghoul should be displayed without background.
+The app favicon should be ghoul icon.
+
+The following units should be used to display probability:
+
+- low probability: merman in the water
+- medium: spearman in plains
+- high probability: mage on a plain
+- 100% probability: ulfserker next to a dark adept
+
+## Example flow
+
+The application starts with the prompt for the total bill amount.
+
+The user enters 10 and clicks "Start".
+
+The application displays: "Remaining: 10". Enter item price.
+
+The user enters 3 in the window. It's close to elf probability (30%).
+When the number is entered, the elf in the forest appears (this is still before the confirmation).
+The user clicks on "Enter" or "Confirm", the RNG runs and determines no payment.
+The elf dissapears and "next item" appears. The total sum is decreased to 7.
+
+The user enters "4". The probability is close to the human in the field. It is displayed.
+RNG runs, and this times the user pays.
+It displays the icon of a ghoul, and says "Item with price 4 pays". Only the restart button is available.
 
 ## How to implement this
 

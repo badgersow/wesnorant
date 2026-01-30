@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wesnorant</title>
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/wesnoth/wesnoth/master/data/core/images/units/undead/ghoul.png">
+    <style>
+        :root {
+            --bg-color: #f0f0f0;
+            --text-color: #111;
+            --accent-color: #d00;
+            --border-width: 4px;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            border-bottom: var(--border-width) solid var(--text-color);
+            padding-bottom: 10px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .display-area {
+            border: var(--border-width) solid var(--text-color);
+            padding: 40px 20px 20px 20px; 
+            margin-bottom: 20px;
+            background: white;
+            min-height: 250px; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end; 
+            position: relative;
+        }
+
+        .status-text {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            z-index: 20; 
+        }
+
+        .sub-text {
+            font-size: 1rem;
+            color: #555;
+            z-index: 20;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.5rem;
+            border: var(--border-width) solid var(--text-color);
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            font-family: inherit;
+            text-align: center;
+        }
+
+        button {
+            width: 100%;
+            padding: 20px;
+            font-size: 1.5rem;
+            background-color: var(--text-color);
+            color: var(--bg-color);
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        button:active {
+            background-color: var(--accent-color);
+        }
+
+        button.secondary {
+            background-color: transparent;
+            color: var(--text-color);
+            border: var(--border-width) solid var(--text-color);
+            padding: 10px;
+            font-size: 1rem;
+        }
+
+        /* Wesnoth Scene */
+        .scene {
+            position: relative; 
+            width: 144px; 
+            height: 72px;
+            margin-bottom: 40px; 
+            transform: scale(2); 
+            transform-origin: center;
+            image-rendering: pixelated;
+            flex-shrink: 0; 
+        }
+
+        .tile {
+            position: absolute;
+            top: 0;
+            left: 36px;
+            width: 72px;
+            height: 72px;
+        }
+        
+        .unit {
+            position: absolute;
+            top: 0;
+            left: 36px;
+            width: 72px;
+            height: 72px;
+            z-index: 10;
+        }
+
+        .unit.attacker {
+            left: -10px; 
+            z-index: 11;
+        }
+        
+        .unit.defender {
+            left: 80px; 
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Wesnorant</h1>
+
+        <!-- Visualization Area -->
+        <div class="display-area" id="visuals">
+            <div id="scene" class="scene hidden">
+                <!-- Injected via JS -->
+            </div>
+            <div id="message" class="status-text">ENTER BILL TOTAL</div>
+            <div id="sub-message" class="sub-text">To start the session</div>
+        </div>
+
+        <!-- Inputs -->
+        <div id="input-section">
+            <input type="number" id="amount-input" placeholder="0.00" step="0.01" inputmode="decimal">
+            <button id="action-btn" onclick="handleAction()">START SESSION</button>
+        </div>
+
+        <!-- Controls -->
+        <div id="controls" class="hidden">
+            <button class="secondary" onclick="resetSession()">RESTART</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration & Assets ---
+        const REPO = "https://raw.githubusercontent.com/wesnoth/wesnoth/master/data/core/images";
+        
+        const ASSETS = {
+            terrain: {
+                flat: `${REPO}/terrain/grass/green.png`,
+                water: `${REPO}/terrain/water/coast-tile.png`
+            },
+            units: {
+                merman: `${REPO}/units/merfolk/fighter.png`,
+                human: `${REPO}/units/human-loyalists/spearman.png`,
+                mage: `${REPO}/units/human-magi/mage.png`,
+                ulfserker: `${REPO}/units/dwarves/ulfserker.png`,
+                adept: `${REPO}/units/undead-necromancers/adept.png`,
+                ghoul: `${REPO}/units/undead/ghoul.png`
+            }
+        };
+
+        // --- State ---
+        let state = 'SETUP'; // SETUP, ACTIVE, ENDED
+        let totalBill = 0;
+        let remaining = 0;
+
+        // --- DOM Elements ---
+        const elInput = document.getElementById('amount-input');
+        const elBtn = document.getElementById('action-btn');
+        const elMessage = document.getElementById('message');
+        const elSubMessage = document.getElementById('sub-message');
+        const elScene = document.getElementById('scene');
+        const elControls = document.getElementById('controls');
+
+        // --- Event Listeners ---
+        elInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                handleAction();
+            } else {
+                handleInputUpdate();
+            }
+        });
+        elInput.addEventListener('change', handleInputUpdate);
+
+        // --- Logic ---
+
+        function handleAction() {
+            const val = parseFloat(elInput.value);
+            if (isNaN(val) || val <= 0) {
+                alert("Please enter a valid positive number.");
+                return;
+            }
+
+            if (state === 'SETUP') {
+                startSession(val);
+            } else if (state === 'ACTIVE') {
+                confirmItem(val);
+            }
+        }
+
+        function handleInputUpdate() {
+            if (state !== 'ACTIVE') return;
+
+            const val = parseFloat(elInput.value);
+            if (isNaN(val) || val <= 0) {
+                clearScene();
+                updateDisplay("ENTER ITEM PRICE", `Remaining: ${formatMoney(remaining)}`);
+                return;
+            }
+
+            // Calculate Probability for Visuals
+            let prob = val / remaining;
+            if (prob > 1) prob = 1;
+            
+            showPredictionVisual(prob);
+        }
+
+        function startSession(amount) {
+            totalBill = amount;
+            remaining = amount;
+            state = 'ACTIVE';
+            
+            // UI Update
+            elInput.value = '';
+            elInput.placeholder = "Item Price";
+            elBtn.innerText = "CONFIRM ITEM";
+            elControls.classList.remove('hidden');
+            updateDisplay("ENTER ITEM PRICE", `Remaining: ${formatMoney(remaining)}`);
+            clearScene();
+        }
+
+        function confirmItem(amount) {
+            let prob = amount / remaining;
+            if (prob > 1) prob = 1;
+
+            const roll = Math.random();
+            const paid = roll < prob;
+            
+            console.log(`Item: ${amount}, Remaining: ${remaining}, Prob: ${prob.toFixed(2)}, Roll: ${roll.toFixed(2)}, PAID: ${paid}`);
+
+            if (paid) {
+                endSession(amount);
+            } else {
+                remaining -= amount;
+                if (remaining < 0.01) remaining = 0;
+                
+                // SAFE:
+                elInput.value = '';
+                elInput.focus();
+                clearScene();
+                updateDisplay("SAFE. NEXT ITEM.", `Remaining: ${formatMoney(remaining)}`);
+            }
+        }
+
+        function endSession(amount) {
+            state = 'ENDED';
+            elInput.classList.add('hidden');
+            elBtn.classList.add('hidden');
+            
+            updateDisplay(`PAYMENT TRIGGERED`, `Item with price ${formatMoney(amount)} pays.`);
+            
+            // Show Ghoul - No terrain
+            renderSingle(ASSETS.units.ghoul);
+        }
+
+        function resetSession() {
+            state = 'SETUP';
+            totalBill = 0;
+            remaining = 0;
+            
+            elInput.value = '';
+            elInput.placeholder = "0.00";
+            elInput.classList.remove('hidden');
+            elBtn.classList.remove('hidden');
+            elBtn.innerText = "START SESSION";
+            elControls.classList.add('hidden');
+            clearScene();
+            updateDisplay("ENTER BILL TOTAL", "To start the session");
+        }
+
+        // --- Visualization ---
+
+        function showPredictionVisual(prob) {
+            // 100% -> Ulfserker vs Adept
+            if (prob >= 1) {
+                renderCombat(ASSETS.units.ulfserker, ASSETS.units.adept);
+                updateDisplay("Hahahahaha", "");
+                return;
+            }
+
+            let unitUrl = '';
+            let terrainUrl = '';
+            let text = '';
+
+            // Prob logic per SPEC.md list:
+            // - low: merman in water
+            // - medium: spearman in plains
+            // - high: mage on a plain
+            
+            if (prob < 0.35) {
+                // Low (<35%)
+                unitUrl = ASSETS.units.merman;
+                terrainUrl = ASSETS.terrain.water;
+                text = "Low Risk (Merman in Water)";
+            } else if (prob < 0.70) {
+                // Medium (35% - 70%)
+                unitUrl = ASSETS.units.human;
+                terrainUrl = ASSETS.terrain.flat;
+                text = "Medium Risk (Spearman in Plains)";
+            } else {
+                // High (>= 70%)
+                unitUrl = ASSETS.units.mage;
+                terrainUrl = ASSETS.terrain.flat;
+                text = "High Risk (Mage in Plains)";
+            }
+
+            renderSingle(unitUrl, terrainUrl);
+            updateDisplay(`Item: ${formatMoney(parseFloat(elInput.value))}`, `Remaining: ${formatMoney(remaining)}`);
+        }
+
+        function renderSingle(unitUrl, terrainUrl) {
+            let html = '';
+            if (terrainUrl) {
+                html += `<img src="${terrainUrl}" class="tile" alt="Terrain">`;
+            }
+            html += `<img src="${unitUrl}" class="unit" alt="Unit">`;
+            elScene.innerHTML = html;
+            elScene.classList.remove('hidden');
+        }
+
+        function renderCombat(attackerUrl, defenderUrl) {
+            // No terrain for this special case as per spec
+            elScene.innerHTML = `
+                <img src="${attackerUrl}" class="unit attacker" alt="Attacker">
+                <img src="${defenderUrl}" class="unit defender" alt="Defender">
+            `;
+            elScene.classList.remove('hidden');
+        }
+
+        function clearScene() {
+            elScene.innerHTML = '';
+            elScene.classList.add('hidden');
+        }
+
+        function updateDisplay(main, sub) {
+            elMessage.innerText = main;
+            elSubMessage.innerText = sub;
+        }
+
+        function formatMoney(num) {
+            return num.toFixed(2);
+        }
+
+        // --- Init ---
+        elInput.focus();
+    </script>
+</body>
+</html>
