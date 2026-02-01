@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wesnorant</title>
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/wesnoth/wesnoth/master/data/core/images/units/undead/ghoul.png">
+    <style>
+        :root {
+            --bg-color: #f0f0f0;
+            --text-color: #111;
+            --accent-color: #d00;
+            --border-width: 4px;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            border-bottom: var(--border-width) solid var(--text-color);
+            padding-bottom: 10px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .display-area {
+            border: var(--border-width) solid var(--text-color);
+            padding: 60px 20px 20px 20px;
+            margin-bottom: 20px;
+            background: white;
+            min-height: 320px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            position: relative;
+        }
+
+        .status-text {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            z-index: 20;
+        }
+
+        .sub-text {
+            font-size: 1rem;
+            color: #555;
+            z-index: 20;
+            white-space: pre-line;
+            text-align: center;
+            height: 3em;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.5rem;
+            border: var(--border-width) solid var(--text-color);
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            font-family: inherit;
+            text-align: center;
+        }
+
+        button {
+            width: 100%;
+            padding: 20px;
+            font-size: 1.5rem;
+            background-color: var(--text-color);
+            color: var(--bg-color);
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        button:active {
+            background-color: var(--accent-color);
+        }
+
+        button.secondary {
+            background-color: transparent;
+            color: var(--text-color);
+            border: var(--border-width) solid var(--text-color);
+            padding: 10px;
+            font-size: 1rem;
+        }
+
+        /* Wesnoth Scene */
+        .scene {
+            position: relative;
+            width: 126px;
+            height: 108px;
+            margin-bottom: 60px;
+            transform: scale(2);
+            transform-origin: center;
+            image-rendering: pixelated;
+            flex-shrink: 0;
+        }
+
+        .tile {
+            position: absolute;
+            width: 72px;
+            height: 72px;
+        }
+
+        .tile.attacker {
+            top: 0;
+            left: 0;
+        }
+
+        .tile.defender {
+            top: 36px;
+            left: 54px;
+        }
+
+        .unit {
+            position: absolute;
+            width: 72px;
+            height: 72px;
+            z-index: 10;
+        }
+
+        .unit.attacker {
+            top: 0;
+            left: 0;
+            z-index: 11;
+        }
+
+        .unit.defender {
+            top: 36px;
+            left: 54px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Wesnorant</h1>
+
+        <!-- Visualization Area -->
+        <div class="display-area" id="visuals">
+            <div id="scene" class="scene hidden">
+                <!-- Injected via JS -->
+            </div>
+            <div id="message" class="status-text">ENTER BILL TOTAL</div>
+            <div id="sub-message" class="sub-text">To start the session</div>
+        </div>
+
+        <!-- Inputs -->
+        <div id="input-section">
+            <input type="number" id="amount-input" placeholder="0.00" step="0.01" inputmode="decimal">
+            <button id="action-btn" onclick="handleAction()">START SESSION</button>
+        </div>
+
+        <!-- Controls -->
+        <div id="controls" class="hidden">
+            <button class="secondary" onclick="resetSession()">RESTART</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration & Assets ---
+        const REPO = "https://raw.githubusercontent.com/wesnoth/wesnoth/master/data/core/images";
+
+        // --- Terrain Definitions ---
+        const TERRAINS = {
+            flat: { name: "Grassland", sprite: `${REPO}/terrain/grass/green.png` },
+            hills: { name: "Hills", sprite: `${REPO}/terrain/hills/regular.png` },
+            forest: { name: "Forest", sprite: `${REPO}/terrain/forest/deciduous-summer.png` },
+            sand: { name: "Sand", sprite: `${REPO}/terrain/sand/beach.png` },
+            swamp: { name: "Swamp", sprite: `${REPO}/terrain/swamp/mud.png` },
+            cave: { name: "Cave", sprite: `${REPO}/terrain/cave/floor.png` }
+        };
+
+        // --- Unit Definitions (20+ units with full combat stats) ---
+        // Each unit can have multiple attacks
+        const UNITS = [
+            // Loyalists
+            {
+                id: "spearman", name: "Spearman", hp: 36,
+                attacks: [
+                    { name: "spear", damage: 8, strikes: 3, type: "pierce", range: "melee" }
+                ],
+                resistances: { blade: 0, pierce: 0, impact: 0, fire: 0, cold: 0, arcane: 20 },
+                defense: { flat: 40, hills: 50, forest: 50, sand: 30, swamp: 20, cave: 30 },
+                sprite: `${REPO}/units/human-loyalists/spearman.png`
+            },
+            {
+                id: "swordsman", name: "Swordsman", hp: 48,
+                attacks: [
+                    { name: "sword", damage: 8, strikes: 4, type: "blade", range: "melee" }
+                ],
+                resistances: { blade: 10, pierce: 0, impact: 10, fire: 0, cold: 0, arcane: 20 },
+                defense: { flat: 40, hills: 50, forest: 50, sand: 30, swamp: 20, cave: 30 },
+                sprite: `${REPO}/units/human-loyalists/swordsman.png`
+            },
+            {
+                id: "bowman", name: "Bowman", hp: 33,
+                attacks: [
+                    { name: "short sword", damage: 4, strikes: 2, type: "blade", range: "melee" },
+                    { name: "bow", damage: 6, strikes: 3, type: "pierce", range: "ranged" }
+                ],
+                resistances: { blade: 0, pierce: 0, impact: 0, fire: 0, cold: 0, arcane: 20 },
+                defense: { flat: 40, hills: 50, forest: 50, sand: 30, swamp: 20, cave: 30 },
+                sprite: `${REPO}/units/human-loyalists/bowman.png`
+            },
+            {
+                id: "horseman", name: "Horseman", hp: 42,
+                attacks: [
+                    { name: "lance", damage: 12, strikes: 2, type: "pierce", range: "melee" },
+                    { name: "sword", damage: 7, strikes: 3, type: "blade", range: "melee" }
+                ],
+                resistances: { blade: 20, pierce: -20, impact: 20, fire: 0, cold: 0, arcane: 20 },
+                defense: { flat: 40, hills: 40, forest: 30, sand: 30, swamp: 20, cave: 20 },
+                sprite: `${REPO}/units/human-loyalists/horseman/horseman.png`
+            },
+            {
+                id: "mage", name: "Mage", hp: 24,
+                attacks: [
+                    { name: "staff", damage: 4, strikes: 1, type: "impact", range: "melee" },
+                    { name: "fireball", damage: 7, strikes: 3, type: "fire", range: "ranged", special: "magical" }
+                ],
+                resistances: { blade: 0, pierce: 0, impact: 0, fire: 0, cold: 0, arcane: 20 },
+                defense: { flat: 40, hills: 50, forest: 50, sand: 30, swamp: 20, cave: 30 },
+                sprite: `${REPO}/units/human-magi/mage.png`
+            },
+            // Undead
+            {
+                id: "skeleton", name: "Skeleton", hp: 40,
+                attacks: [
+                    { name: "sword", damage: 5, strikes: 3, type: "blade", range: "melee" }
+                ],
+                resistances: { blade: 40, pierce: 60, impact: -20, fire: -20, cold: 60, arcane: -50 },
+                defense: { flat: 40, hills: 50, forest: 50, sand: 30, swamp: 20, cave: 40 },
+                sprite: `${REPO}/units/undead-skeletal/skeleton/skeleton.png`
+            },
+            {
+                id: "ghoul", name: "Ghoul", hp: 33,
+                attacks: [
+                    { name: "claws", damage: 5, strikes: 3, type: "blade", range: "melee" }
+                ],
+                resistances: { blade: 0, pierce: 0, impact: 0, fire: 0, cold: 40, arcane: -40 },
+                defense: { flat: 40, hills: 50, forest: 50, sand: 20, swamp: 40, cave: 40 },
+                sprite: `${REPO}/units/undead/ghoul.png`
+            },
+            {
+                id: "dark_adept", name: "Dark Adept", hp: 24,
+                attacks: [
+                    { name: "chill wave", damage: 7, strikes: 2, type: "cold", range: "ranged", special: "magical" }
+                ],
+                resistances: { blade: 0, pierce: 0, impact: 0, fire: 0, cold: 40, arcane: -20 },
+                defense: { flat: 40, hills: 50, forest: 50, sand: 20, swamp: 30, cave: 40 },
+                sprite: `${REPO}/units/undead-necromancers/adept.png`
+            },
+            {
+                id: "revenant", name: "Revenant", hp: 40,
+                attacks: [
+                    { name: "sword", damage: 8, strikes: 4, type: "blade", range: "melee" }
+                ],
+                resistances: { blade: 40, pierce: 60, impact: -20, fire: -20, cold: 60, arcane: -50 },
+                defense: { flat: 40, hills: 50, forest: 50, sand: 20, swamp: 20, cave: 40 },
+                sprite: `${REPO}/units/undead-skeletal/revenant/revenant.png`
+            },
+            {
+                id: "lich", name: "Lich", hp: 60,
+                attacks: [
+                    { name: "touch", damage: 8, strikes: 2, type: "arcane", range: "melee", special: "magical" },
+                    { name: "chill wave", damage: 9, strikes: 4, type: "cold", range: "ranged", special: "magical" }
+                ],
+                resistances: { blade: 40, pierce: 60, impact: -20, fire: -20, cold: 60, arcane: -50 },
+                defense: { flat: 40, hills: 50, forest: 50, sand: 30, swamp: 20, cave: 40 },
+                sprite: `${REPO}/units/undead-necromancers/lich.png`
+            },
+            {
+                id: "death_knight", name: "Death Knight", hp: 66,
+                attacks: [
+                    { name: "sword", damage: 10, strikes: 4, type: "blade", range: "melee" }
+                ],
+                resistances: { blade: 40, pierce: 60, impact: -20, fire: -20, cold: 60, arcane: -50 },
+                defense: { flat: 40, hills: 50, forest: 50, sand: 30, swamp: 20, cave: 40 },
+                sprite: `${REPO}/units/undead-skeletal/deathknight.png`
+            },
+            // Drakes
+            {
+                id: "drake_burner", name: "Drake Burner", hp: 42,
+                attacks: [
+                    { name: "battle claws", damage: 5, strikes: 2, type: "blade", range: "melee" },
+                    { name: "fire breath", damage: 6, strikes: 3, type: "fire", range: "ranged" }
+                ],
+                resistances: { blade: 0, pierce: 0, impact: 0, fire: 50, cold: -50, arcane: -30 },
+                defense: { flat: 40, hills: 40, forest: 40, sand: 50, swamp: 30, cave: 40 },
+                sprite: `${REPO}/units/drakes/burner.png`
+            },
+            {
+                id: "drake_fighter", name: "Drake Fighter", hp: 45,
+                attacks: [
+                    { name: "war spear", damage: 9, strikes: 2, type: "pierce", range: "melee" },
+                    { name: "fire breath", damage: 4, strikes: 2, type: "fire", range: "ranged" }
+                ],
+                resistances: { blade: 0, pierce: 0, impact: 0, fire: 50, cold: -50, arcane: -30 },
+                defense: { flat: 40, hills: 40, forest: 40, sand: 50, swamp: 30, cave: 40 },
+                sprite: `${REPO}/units/drakes/fighter.png`
+            },
+            {
+                id: "drake_clasher", name: "Drake Clasher", hp: 43,
+                attacks: [
+                    { name: "war talon", damage: 5, strikes: 4, type: "blade", range: "melee" },
+                    { name: "spear", damage: 6, strikes: 4, type: "pierce", range: "melee" }
+                ],
+                resistances: { blade: 20, pierce: 0, impact: 30, fire: 50, cold: -50, arcane: -10 },
+                defense: { flat: 30, hills: 40, forest: 40, sand: 40, swamp: 20, cave: 30 },
+                sprite: `${REPO}/units/drakes/clasher.png`
+            },
+            // Elves
+            {
+                id: "elvish_fighter", name: "Elvish Fighter", hp: 33,
+                attacks: [
+                    { name: "sword", damage: 5, strikes: 4, type: "blade", range: "melee" },
+                    { name: "bow", damage: 3, strikes: 3, type: "pierce", range: "ranged" }
+                ],
+                resistances: { blade: 0, pierce: 0, impact: 0, fire: 0, cold: 0, arcane: -10 },
+                defense: { flat: 40, hills: 40, forest: 60, sand: 30, swamp: 30, cave: 30 },
+                sprite: `${REPO}/units/elves-wood/fighter/fighter.png`
+            },
+            {
+                id: "elvish_archer", name: "Elvish Archer", hp: 30,
+                attacks: [
+                    { name: "short sword", damage: 4, strikes: 2, type: "blade", range: "melee" },
+                    { name: "bow", damage: 5, strikes: 4, type: "pierce", range: "ranged" }
+                ],
+                resistances: { blade: 0, pierce: 0, impact: 0, fire: 0, cold: 0, arcane: -10 },
+                defense: { flat: 40, hills: 40, forest: 70, sand: 30, swamp: 30, cave: 30 },
+                sprite: `${REPO}/units/elves-wood/archer+female.png`
+            },
+            {
+                id: "elvish_scout", name: "Elvish Scout", hp: 29,
+                attacks: [
+                    { name: "sword", damage: 4, strikes: 3, type: "blade", range: "melee" }
+                ],
+                resistances: { blade: 0, pierce: -20, impact: 0, fire: 0, cold: 0, arcane: -10 },
+                defense: { flat: 40, hills: 40, forest: 70, sand: 30, swamp: 30, cave: 30 },
+                sprite: `${REPO}/units/elves-wood/scout/scout.png`
+            },
+            // Dwarves
+            {
+                id: "dwarf_fighter", name: "Dwarf Fighter", hp: 38,
+                attacks: [
+                    { name: "axe", damage: 7, strikes: 3, type: "blade", range: "melee" }
+                ],
+                resistances: { blade: 20, pierce: 20, impact: 20, fire: 10, cold: 10, arcane: 10 },
+                defense: { flat: 30, hills: 60, forest: 30, sand: 30, swamp: 20, cave: 60 },
+                sprite: `${REPO}/units/dwarves/fighter.png`
+            },
+            {
+                id: "dwarf_thunderer", name: "Dwarf Thunderer", hp: 37,
+                attacks: [
+                    { name: "dagger", damage: 4, strikes: 2, type: "blade", range: "melee" },
+                    { name: "thunderstick", damage: 17, strikes: 1, type: "pierce", range: "ranged" }
+                ],
+                resistances: { blade: 20, pierce: 20, impact: 20, fire: 10, cold: 10, arcane: 10 },
+                defense: { flat: 30, hills: 60, forest: 30, sand: 30, swamp: 20, cave: 60 },
+                sprite: `${REPO}/units/dwarves/thunderer/thunderer.png`
+            },
+            {
+                id: "ulfserker", name: "Ulfserker", hp: 38,
+                attacks: [
+                    { name: "battle axe", damage: 8, strikes: 4, type: "blade", range: "melee" }
+                ],
+                resistances: { blade: 10, pierce: 10, impact: 10, fire: 0, cold: 0, arcane: 10 },
+                defense: { flat: 30, hills: 60, forest: 30, sand: 30, swamp: 20, cave: 60 },
+                sprite: `${REPO}/units/dwarves/ulfserker.png`
+            },
+            // Orcs
+            {
+                id: "orcish_grunt", name: "Orcish Grunt", hp: 38,
+                attacks: [
+                    { name: "sword", damage: 9, strikes: 2, type: "blade", range: "melee" }
+                ],
+                resistances: { blade: 0, pierce: 0, impact: 0, fire: 0, cold: 0, arcane: 0 },
+                defense: { flat: 40, hills: 50, forest: 40, sand: 20, swamp: 20, cave: 40 },
+                sprite: `${REPO}/units/orcs/grunt.png`
+            },
+            {
+                id: "orcish_archer", name: "Orcish Archer", hp: 33,
+                attacks: [
+                    { name: "short sword", damage: 3, strikes: 2, type: "blade", range: "melee" },
+                    { name: "bow", damage: 6, strikes: 3, type: "pierce", range: "ranged" }
+                ],
+                resistances: { blade: 0, pierce: 0, impact: 0, fire: 0, cold: 0, arcane: 0 },
+                defense: { flat: 40, hills: 50, forest: 40, sand: 20, swamp: 20, cave: 40 },
+                sprite: `${REPO}/units/orcs/archer.png`
+            },
+            {
+                id: "troll_whelp", name: "Troll Whelp", hp: 42,
+                attacks: [
+                    { name: "fist", damage: 7, strikes: 3, type: "impact", range: "melee" }
+                ],
+                resistances: { blade: 0, pierce: 0, impact: 0, fire: -10, cold: 0, arcane: 0 },
+                defense: { flat: 40, hills: 50, forest: 40, sand: 20, swamp: 30, cave: 50 },
+                sprite: `${REPO}/units/trolls/whelp.png`
+            },
+            // High-Level Units
+            {
+                id: "grand_knight", name: "Grand Knight", hp: 62,
+                attacks: [
+                    { name: "lance", damage: 14, strikes: 2, type: "pierce", range: "melee" },
+                    { name: "sword", damage: 9, strikes: 4, type: "blade", range: "melee" }
+                ],
+                resistances: { blade: 30, pierce: -20, impact: 40, fire: 0, cold: 0, arcane: 20 },
+                defense: { flat: 40, hills: 40, forest: 30, sand: 30, swamp: 20, cave: 20 },
+                sprite: `${REPO}/units/human-loyalists/grand-knight/grand-knight.png`
+            },
+            {
+                id: "arch_mage", name: "Arch Mage", hp: 54,
+                attacks: [
+                    { name: "staff", damage: 6, strikes: 2, type: "impact", range: "melee" },
+                    { name: "fireball", damage: 12, strikes: 4, type: "fire", range: "ranged", special: "magical" }
+                ],
+                resistances: { blade: 0, pierce: 0, impact: 0, fire: 20, cold: 0, arcane: 20 },
+                defense: { flat: 40, hills: 50, forest: 50, sand: 30, swamp: 20, cave: 30 },
+                sprite: `${REPO}/units/human-magi/arch-mage+female.png`
+            },
+            {
+                id: "ancient_lich", name: "Ancient Lich", hp: 80,
+                attacks: [
+                    { name: "touch", damage: 9, strikes: 3, type: "arcane", range: "melee", special: "magical" },
+                    { name: "chill wave", damage: 12, strikes: 4, type: "cold", range: "ranged", special: "magical" }
+                ],
+                resistances: { blade: 40, pierce: 60, impact: -20, fire: -20, cold: 60, arcane: -50 },
+                defense: { flat: 40, hills: 50, forest: 50, sand: 30, swamp: 20, cave: 40 },
+                sprite: `${REPO}/units/undead-necromancers/ancient-lich.png`
+            }
+        ];
+
+        // --- Combat Probability Calculation ---
+
+        // Debug flag - set to true to print detailed calculation logs
+        const DEBUG_PRINT = true;
+        const DEBUG_UNITS = ['orcish_grunt', 'dwarf_thunderer']; // Only debug these unit pairs
+        const DEBUG_TERRAIN = 'hills'; // Only debug this terrain (null for all);
+
+        /**
+         * Find the best attack for a unit to initiate with.
+         * Returns the attack that would give highest kill probability.
+         */
+        function findBestInitiateAttack(unit) {
+            // For now, return the attack with highest expected damage (damage * strikes)
+            let best = null;
+            let bestDamage = 0;
+            for (const attack of unit.attacks) {
+                const expected = attack.damage * attack.strikes;
+                if (expected > bestDamage) {
+                    bestDamage = expected;
+                    best = attack;
+                }
+            }
+            return best;
+        }
+
+        /**
+         * Find the best response attack matching the given range.
+         * Returns null if no matching range attack exists.
+         */
+        function findBestResponse(unit, range) {
+            let best = null;
+            let bestDamage = 0;
+            for (const attack of unit.attacks) {
+                if (attack.range === range) {
+                    const expected = attack.damage * attack.strikes;
+                    if (expected > bestDamage) {
+                        bestDamage = expected;
+                        best = attack;
+                    }
+                }
+            }
+            return best;
+        }
+
+        /**
+         * Calculate kill probability with alternating turns.
+         * Combat flow: A attacks → D responds → D attacks → A responds → repeat
+         * Each side picks their best attack when initiating.
+         * Responder must match range or can't counter.
+         */
+        function computeKillProb(aHP, dHP, aTurn, dTurn, terrain) {
+            // aTurn: { attack, response } - A's attack when initiating, A's response to D's attack
+            // dTurn: { attack, response } - D's attack when initiating, D's response to A's attack
+
+            const memo = new Map();
+            const MIN_PROB = 1e-6;
+
+            function solve(aHP, dHP, aStr, dStr, phase, turn, pathProb) {
+                // Prune low probability paths
+                if (pathProb < MIN_PROB) {
+                    if (dHP <= 0) return 1.0;
+                    if (aHP <= 0) return 0.0;
+                    return 0.5; // Rough estimate for pruned paths
+                }
+
+                // Base cases
+                if (dHP <= 0) return 1.0;  // Defender dead -> attacker wins
+                if (aHP <= 0) return 0.0;  // Attacker dead -> attacker loses
+
+                const key = `${aHP},${dHP},${aStr},${dStr},${phase},${turn}`;
+                if (memo.has(key)) return memo.get(key);
+
+                let prob;
+
+                if (turn === 'a_initiates') {
+                    // A is initiating, D is responding
+                    if (phase === 'attacker') {
+                        if (aStr > 0) {
+                            const hit = aTurn.attackHit;
+                            const dmg = aTurn.attackDmg;
+                            prob = hit * solve(aHP, dHP - dmg, aStr - 1, dStr, 'attacker', turn, pathProb * hit) +
+                                   (1 - hit) * solve(aHP, dHP, aStr - 1, dStr, 'attacker', turn, pathProb * (1 - hit));
+                        } else {
+                            // A done attacking, D responds
+                            prob = solve(aHP, dHP, aStr, dTurn.responseStrikes, 'defender', turn, pathProb);
+                        }
+                    } else {
+                        // Defender responding
+                        if (dStr > 0 && dTurn.responseDmg > 0) {
+                            const hit = dTurn.responseHit;
+                            const dmg = dTurn.responseDmg;
+                            prob = hit * solve(aHP - dmg, dHP, aStr, dStr - 1, 'defender', turn, pathProb * hit) +
+                                   (1 - hit) * solve(aHP, dHP, aStr, dStr - 1, 'defender', turn, pathProb * (1 - hit));
+                        } else {
+                            // D can't respond or done, switch to D initiates
+                            prob = solve(aHP, dHP, dTurn.attackStrikes, 0, 'attacker', 'd_initiates', pathProb);
+                        }
+                    }
+                } else {
+                    // D is initiating, A is responding
+                    if (phase === 'attacker') {
+                        // "attacker" here means the initiator (D)
+                        if (aStr > 0) {
+                            const hit = dTurn.attackHit;
+                            const dmg = dTurn.attackDmg;
+                            prob = hit * solve(aHP - dmg, dHP, aStr - 1, dStr, 'attacker', turn, pathProb * hit) +
+                                   (1 - hit) * solve(aHP, dHP, aStr - 1, dStr, 'attacker', turn, pathProb * (1 - hit));
+                        } else {
+                            // D done attacking, A responds
+                            prob = solve(aHP, dHP, 0, aTurn.responseStrikes, 'defender', turn, pathProb);
+                        }
+                    } else {
+                        // A responding
+                        if (dStr > 0 && aTurn.responseDmg > 0) {
+                            const hit = aTurn.responseHit;
+                            const dmg = aTurn.responseDmg;
+                            prob = hit * solve(aHP, dHP - dmg, aStr, dStr - 1, 'defender', turn, pathProb * hit) +
+                                   (1 - hit) * solve(aHP, dHP, aStr, dStr - 1, 'defender', turn, pathProb * (1 - hit));
+                        } else {
+                            // A can't respond or done, switch to A initiates
+                            prob = solve(aHP, dHP, aTurn.attackStrikes, 0, 'attacker', 'a_initiates', pathProb);
+                        }
+                    }
+                }
+
+                memo.set(key, prob);
+                return prob;
+            }
+
+            return solve(aHP, dHP, aTurn.attackStrikes, 0, 'attacker', 'a_initiates', 1.0);
+        }
+
+        /**
+         * Calculate hit chance, applying special ability minimums.
+         * magical: minimum 70% hit chance
+         * marksman: minimum 60% hit chance
+         */
+        function getHitChance(attack, targetDefense, terrain) {
+            let hitChance = (100 - targetDefense[terrain]) / 100;
+
+            // Apply special ability minimums
+            if (attack.special === 'magical') {
+                hitChance = Math.max(0.70, hitChance);
+            } else if (attack.special === 'marksman') {
+                hitChance = Math.max(0.60, hitChance);
+            }
+
+            return hitChance;
+        }
+
+        /**
+         * Calculate damage and hit chance for an attack against a target.
+         */
+        function getAttackStats(attack, attacker, target, terrain) {
+            if (!attack) return { dmg: 0, hit: 0, strikes: 0 };
+
+            const resist = target.resistances[attack.type] || 0;
+            const dmg = Math.max(1, Math.round(attack.damage * (100 - resist) / 100));
+            const hit = getHitChance(attack, target.defense, terrain);
+            return { dmg, hit, strikes: attack.strikes, attack };
+        }
+
+        /**
+         * Calculate kill probability for attacker vs defender on terrain.
+         * Uses new alternating turn model.
+         */
+        function calculateKillProbability(attacker, defender, terrain) {
+            // Check if we should debug this pair
+            const shouldDebug = DEBUG_PRINT &&
+                DEBUG_UNITS.includes(attacker.id) &&
+                DEBUG_UNITS.includes(defender.id) &&
+                (DEBUG_TERRAIN === null || DEBUG_TERRAIN === terrain);
+
+            // Find best attacks for each unit
+            const aInitAttack = findBestInitiateAttack(attacker);
+            const dInitAttack = findBestInitiateAttack(defender);
+
+            if (!aInitAttack || !dInitAttack) {
+                return null; // Units need at least one attack
+            }
+
+            // Find responses (must match initiator's range)
+            const aResponseAttack = findBestResponse(attacker, dInitAttack.range);
+            const dResponseAttack = findBestResponse(defender, aInitAttack.range);
+
+            // Calculate stats for A initiating
+            const aAttackStats = getAttackStats(aInitAttack, attacker, defender, terrain);
+            const dResponseStats = getAttackStats(dResponseAttack, defender, attacker, terrain);
+
+            // Calculate stats for D initiating
+            const dAttackStats = getAttackStats(dInitAttack, defender, attacker, terrain);
+            const aResponseStats = getAttackStats(aResponseAttack, attacker, defender, terrain);
+
+            if (shouldDebug) {
+                console.log(`\n[DEBUG] ========================================`);
+                console.log(`[DEBUG] === ${attacker.name} vs ${defender.name} on ${TERRAINS[terrain].name} ===`);
+                console.log(`[DEBUG] Attacker: ${attacker.name} (HP: ${attacker.hp})`);
+                console.log(`[DEBUG] Defender: ${defender.name} (HP: ${defender.hp})`);
+                console.log(`[DEBUG]`);
+                console.log(`[DEBUG] When ${attacker.name} initiates:`);
+                console.log(`[DEBUG]   Attack: ${aInitAttack.name} (${aInitAttack.damage}x${aInitAttack.strikes} ${aInitAttack.type} ${aInitAttack.range})${aInitAttack.special ? ' [' + aInitAttack.special + ']' : ''}`);
+                const aInitResist = defender.resistances[aInitAttack.type] || 0;
+                console.log(`[DEBUG]   -> ${defender.name} ${aInitAttack.type} resistance: ${aInitResist}%`);
+                console.log(`[DEBUG]   -> Damage: ${aInitAttack.damage} * (100 - ${aInitResist}) / 100 = ${aAttackStats.dmg}`);
+                console.log(`[DEBUG]   -> ${defender.name} ${terrain} defense: ${defender.defense[terrain]}%`);
+                console.log(`[DEBUG]   -> Hit chance: 100 - ${defender.defense[terrain]} = ${(aAttackStats.hit * 100).toFixed(0)}%`);
+                if (dResponseAttack) {
+                    console.log(`[DEBUG]   Response: ${dResponseAttack.name} (${dResponseAttack.damage}x${dResponseAttack.strikes} ${dResponseAttack.type})${dResponseAttack.special ? ' [' + dResponseAttack.special + ']' : ''}`);
+                    const dRespResist = attacker.resistances[dResponseAttack.type] || 0;
+                    console.log(`[DEBUG]   -> ${attacker.name} ${dResponseAttack.type} resistance: ${dRespResist}%`);
+                    console.log(`[DEBUG]   -> Damage: ${dResponseAttack.damage} * (100 - ${dRespResist}) / 100 = ${dResponseStats.dmg}`);
+                    console.log(`[DEBUG]   -> ${attacker.name} ${terrain} defense: ${attacker.defense[terrain]}%`);
+                    console.log(`[DEBUG]   -> Hit chance: 100 - ${attacker.defense[terrain]} = ${(dResponseStats.hit * 100).toFixed(0)}%`);
+                } else {
+                    console.log(`[DEBUG]   Response: NONE (no ${aInitAttack.range} attack)`);
+                }
+                console.log(`[DEBUG]`);
+                console.log(`[DEBUG] When ${defender.name} initiates:`);
+                console.log(`[DEBUG]   Attack: ${dInitAttack.name} (${dInitAttack.damage}x${dInitAttack.strikes} ${dInitAttack.type} ${dInitAttack.range})${dInitAttack.special ? ' [' + dInitAttack.special + ']' : ''}`);
+                const dInitResist = attacker.resistances[dInitAttack.type] || 0;
+                console.log(`[DEBUG]   -> ${attacker.name} ${dInitAttack.type} resistance: ${dInitResist}%`);
+                console.log(`[DEBUG]   -> Damage: ${dInitAttack.damage} * (100 - ${dInitResist}) / 100 = ${dAttackStats.dmg}`);
+                console.log(`[DEBUG]   -> ${attacker.name} ${terrain} defense: ${attacker.defense[terrain]}%`);
+                console.log(`[DEBUG]   -> Hit chance: 100 - ${attacker.defense[terrain]} = ${(dAttackStats.hit * 100).toFixed(0)}%`);
+                if (aResponseAttack) {
+                    console.log(`[DEBUG]   Response: ${aResponseAttack.name} (${aResponseAttack.damage}x${aResponseAttack.strikes} ${aResponseAttack.type})${aResponseAttack.special ? ' [' + aResponseAttack.special + ']' : ''}`);
+                    const aRespResist = defender.resistances[aResponseAttack.type] || 0;
+                    console.log(`[DEBUG]   -> ${defender.name} ${aResponseAttack.type} resistance: ${aRespResist}%`);
+                    console.log(`[DEBUG]   -> Damage: ${aResponseAttack.damage} * (100 - ${aRespResist}) / 100 = ${aResponseStats.dmg}`);
+                    console.log(`[DEBUG]   -> ${defender.name} ${terrain} defense: ${defender.defense[terrain]}%`);
+                    console.log(`[DEBUG]   -> Hit chance: 100 - ${defender.defense[terrain]} = ${(aResponseStats.hit * 100).toFixed(0)}%`);
+                } else {
+                    console.log(`[DEBUG]   Response: NONE (no ${dInitAttack.range} attack)`);
+                }
+            }
+
+            // Build turn structures
+            const aTurn = {
+                attackDmg: aAttackStats.dmg,
+                attackHit: aAttackStats.hit,
+                attackStrikes: aAttackStats.strikes,
+                responseDmg: aResponseStats.dmg,
+                responseHit: aResponseStats.hit,
+                responseStrikes: aResponseStats.strikes
+            };
+
+            const dTurn = {
+                attackDmg: dAttackStats.dmg,
+                attackHit: dAttackStats.hit,
+                attackStrikes: dAttackStats.strikes,
+                responseDmg: dResponseStats.dmg,
+                responseHit: dResponseStats.hit,
+                responseStrikes: dResponseStats.strikes
+            };
+
+            const killProb = computeKillProb(attacker.hp, defender.hp, aTurn, dTurn, terrain);
+
+            if (shouldDebug) {
+                console.log(`[DEBUG]`);
+                console.log(`[DEBUG] KILL PROBABILITY: ${(killProb * 100).toFixed(2)}%`);
+                console.log(`[DEBUG] ========================================`);
+            }
+
+            return {
+                killProb,
+                aInitAttack,
+                dInitAttack,
+                aResponseAttack,
+                dResponseAttack
+            };
+        }
+
+        // --- Pre-compute Combat Lookup Table ---
+        const COMBAT_LOOKUP = [];
+
+        function buildCombatLookup() {
+            for (const attacker of UNITS) {
+                for (const defender of UNITS) {
+                    if (attacker.id === defender.id) continue;
+
+                    for (const terrain of Object.keys(TERRAINS)) {
+                        const result = calculateKillProbability(attacker, defender, terrain);
+
+                        if (result) {
+                            COMBAT_LOOKUP.push({
+                                attacker,
+                                defender,
+                                terrain,
+                                killProb: result.killProb,
+                                aInitAttack: result.aInitAttack,
+                                dInitAttack: result.dInitAttack
+                            });
+                        }
+                    }
+                }
+            }
+
+            COMBAT_LOOKUP.sort((a, b) => a.killProb - b.killProb);
+            console.log(`Combat lookup table built: ${COMBAT_LOOKUP.length} matchups`);
+            console.log(`Probability range: ${(COMBAT_LOOKUP[0].killProb * 100).toFixed(1)}% - ${(COMBAT_LOOKUP[COMBAT_LOOKUP.length - 1].killProb * 100).toFixed(1)}%`);
+        }
+
+        /**
+         * Find the closest matching combat scenario for a target probability.
+         * Uses binary search for efficiency.
+         */
+        function findClosestMatch(targetProb) {
+            if (COMBAT_LOOKUP.length === 0) return null;
+
+            // Binary search for closest
+            let left = 0;
+            let right = COMBAT_LOOKUP.length - 1;
+
+            while (left < right) {
+                const mid = Math.floor((left + right) / 2);
+                if (COMBAT_LOOKUP[mid].killProb < targetProb) {
+                    left = mid + 1;
+                } else {
+                    right = mid;
+                }
+            }
+
+            // Check adjacent entries for closest match
+            let closest = COMBAT_LOOKUP[left];
+            let minDiff = Math.abs(closest.killProb - targetProb);
+
+            if (left > 0) {
+                const diff = Math.abs(COMBAT_LOOKUP[left - 1].killProb - targetProb);
+                if (diff < minDiff) {
+                    closest = COMBAT_LOOKUP[left - 1];
+                    minDiff = diff;
+                }
+            }
+
+            if (left < COMBAT_LOOKUP.length - 1) {
+                const diff = Math.abs(COMBAT_LOOKUP[left + 1].killProb - targetProb);
+                if (diff < minDiff) {
+                    closest = COMBAT_LOOKUP[left + 1];
+                }
+            }
+
+            return closest;
+        }
+
+        // Build lookup table on load
+        buildCombatLookup();
+
+        // --- State ---
+        let state = 'SETUP'; // SETUP, ACTIVE, ENDED
+        let totalBill = 0;
+        let remaining = 0;
+
+        // --- DOM Elements ---
+        const elInput = document.getElementById('amount-input');
+        const elBtn = document.getElementById('action-btn');
+        const elMessage = document.getElementById('message');
+        const elSubMessage = document.getElementById('sub-message');
+        const elScene = document.getElementById('scene');
+        const elControls = document.getElementById('controls');
+
+        // --- Event Listeners ---
+        elInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                handleAction();
+            } else {
+                handleInputUpdate();
+            }
+        });
+        elInput.addEventListener('change', handleInputUpdate);
+
+        // --- Logic ---
+
+        function handleAction() {
+            const val = parseFloat(elInput.value);
+            if (isNaN(val) || val <= 0) {
+                alert("Please enter a valid positive number.");
+                return;
+            }
+
+            if (state === 'SETUP') {
+                startSession(val);
+            } else if (state === 'ACTIVE') {
+                confirmItem(val);
+            }
+        }
+
+        function handleInputUpdate() {
+            if (state !== 'ACTIVE') return;
+
+            const val = parseFloat(elInput.value);
+            if (isNaN(val) || val <= 0) {
+                clearScene();
+                updateDisplay("ENTER ITEM PRICE", `Remaining: ${formatMoney(remaining)}`);
+                return;
+            }
+
+            // Calculate Probability for Visuals
+            let prob = val / remaining;
+
+            showPredictionVisual(prob);
+        }
+
+        function startSession(amount) {
+            totalBill = amount;
+            remaining = amount;
+            state = 'ACTIVE';
+
+            // UI Update
+            elInput.value = '';
+            elInput.placeholder = "Item Price";
+            elBtn.innerText = "CONFIRM ITEM";
+            elControls.classList.remove('hidden');
+            updateDisplay("ENTER ITEM PRICE", `Remaining: ${formatMoney(remaining)}`);
+            clearScene();
+        }
+
+        function confirmItem(amount) {
+            let prob = amount / remaining;
+            if (prob > 1) prob = 1;
+
+            const roll = Math.random();
+            const paid = roll < prob;
+
+            console.log(`Item: ${amount}, Remaining: ${remaining}, Prob: ${prob.toFixed(2)}, Roll: ${roll.toFixed(2)}, PAID: ${paid}`);
+
+            if (paid) {
+                endSession(amount);
+            } else {
+                remaining -= amount;
+                if (remaining < 0.01) remaining = 0;
+
+                // SAFE:
+                elInput.value = '';
+                elInput.focus();
+                clearScene();
+                updateDisplay("SAFE. NEXT ITEM.", `Remaining: ${formatMoney(remaining)}`);
+            }
+        }
+
+        function endSession(amount) {
+            state = 'ENDED';
+            elInput.classList.add('hidden');
+            elBtn.classList.add('hidden');
+
+            updateDisplay(`PAYMENT TRIGGERED`, `Item with price ${formatMoney(amount)} pays.`);
+
+            // Show Ghoul - find it from UNITS array
+            const ghoul = UNITS.find(u => u.id === 'ghoul');
+            renderSingle(ghoul ? ghoul.sprite : '');
+        }
+
+        function resetSession() {
+            state = 'SETUP';
+            totalBill = 0;
+            remaining = 0;
+
+            elInput.value = '';
+            elInput.placeholder = "0.00";
+            elInput.classList.remove('hidden');
+            elBtn.classList.remove('hidden');
+            elBtn.innerText = "START SESSION";
+            elControls.classList.add('hidden');
+            clearScene();
+            updateDisplay("ENTER BILL TOTAL", "To start the session");
+        }
+
+        // --- Visualization ---
+
+        function showPredictionVisual(prob) {
+            // Handle edge cases
+            if (prob <= 0) {
+                // Show Dark Adept vs Ulfserker (reversed) with "it's over"
+                const ulfserker = UNITS.find(u => u.id === 'ulfserker');
+                const darkAdept = UNITS.find(u => u.id === 'dark_adept');
+                if (ulfserker && darkAdept) {
+                    renderCombatScene(darkAdept, ulfserker, 'flat');
+                }
+                updateDisplay("It's over", "");
+                return;
+            }
+
+            if (prob >= 1) {
+                // Show Ulfserker vs Dark Adept with "it's over"
+                const ulfserker = UNITS.find(u => u.id === 'ulfserker');
+                const darkAdept = UNITS.find(u => u.id === 'dark_adept');
+                if (ulfserker && darkAdept) {
+                    renderCombatScene(ulfserker, darkAdept, 'flat');
+                }
+                updateDisplay("It's over", "");
+                return;
+            }
+
+            const match = findClosestMatch(prob);
+            if (!match) {
+                clearScene();
+                updateDisplay("NO MATCH FOUND", "Error in combat lookup");
+                return;
+            }
+
+            renderCombatScene(match.attacker, match.defender, match.terrain);
+
+            const percentStr = `${Math.round(prob * 100)}% chance to pay`;
+            const matchInfo = `it's like\n${match.attacker.name} attacks ${match.defender.name} on ${TERRAINS[match.terrain].name}`;
+            updateDisplay(percentStr, matchInfo);
+        }
+
+        function renderCombatScene(attacker, defender, terrain) {
+            const terrainUrl = TERRAINS[terrain].sprite;
+            elScene.innerHTML = `
+                <img src="${terrainUrl}" class="tile attacker" alt="Terrain">
+                <img src="${terrainUrl}" class="tile defender" alt="Terrain">
+                <img src="${attacker.sprite}" class="unit attacker" alt="${attacker.name}">
+                <img src="${defender.sprite}" class="unit defender" alt="${defender.name}">
+            `;
+            elScene.classList.remove('hidden');
+        }
+
+        function renderSingle(unitUrl) {
+            // Center single unit (e.g. Ghoul for end state)
+            elScene.innerHTML = `<img src="${unitUrl}" class="unit" alt="Unit">`;
+            elScene.classList.remove('hidden');
+        }
+
+        function clearScene() {
+            elScene.innerHTML = '';
+            elScene.classList.add('hidden');
+        }
+
+        function updateDisplay(main, sub) {
+            elMessage.innerText = main;
+            elSubMessage.innerText = sub;
+        }
+
+        function formatMoney(num) {
+            return num.toFixed(2);
+        }
+
+        // --- Init ---
+        elInput.focus();
+    </script>
+</body>
+</html>
