@@ -81,6 +81,25 @@
             text-align: center;
         }
 
+        #input-section {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        #input-section input[type="number"] {
+            margin-bottom: 0;
+            width: 0;
+            flex-grow: 1;
+        }
+
+        #input-section button {
+            width: auto;
+            margin-bottom: 0;
+            padding: 15px;
+        }
+
         button {
             width: 100%;
             padding: 20px;
@@ -965,7 +984,7 @@
             renderCombatScene(match.attacker, match.defender, match.terrain);
 
             const percentStr = `${Math.round(prob * 100)}% chance to pay`;
-            const matchInfo = `it's like\n${match.attacker.name} attacks ${match.defender.name} on ${TERRAINS[match.terrain].name}`;
+            const matchInfo = `it's like\n${match.defender.name} is killed by ${match.attacker.name} on ${TERRAINS[match.terrain].name}`;
             updateDisplay(percentStr, matchInfo);
         }
 
