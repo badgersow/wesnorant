@@ -153,6 +153,11 @@
             left: 54px;
         }
 
+        .unit.centered {
+            top: 18px;
+            left: 27px;
+        }
+
         .hidden {
             display: none;
         }
@@ -977,7 +982,7 @@
 
         function renderSingle(unitUrl) {
             // Center single unit (e.g. Ghoul for end state)
-            elScene.innerHTML = `<img src="${unitUrl}" class="unit" alt="Unit">`;
+            elScene.innerHTML = `<img src="${unitUrl}" class="unit centered" alt="Unit">`;
             elScene.classList.remove('hidden');
         }
 
